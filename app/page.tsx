@@ -5,7 +5,6 @@ import Stats from "@/components/Stats";
 import HowItWorks from "@/components/HowItWorks";
 import EarningPotential from "@/components/EarningPotential";
 import Pricing from "@/components/Pricing";
-import Disclaimer from "@/components/Disclaimer";
 import Footer from "@/components/Footer";
 
 export default function Home() {
@@ -18,7 +17,6 @@ export default function Home() {
       <HowItWorks />
       <EarningPotential />
       <Pricing />
-      <Disclaimer />
       <Footer />
     </main>
   );

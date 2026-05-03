@@ -72,7 +72,7 @@ export default function HowItWorksPage() {
       <PageHero
         badge="The Process"
         badgeColor="blue"
-        title="How NexaAI"
+        title="How RPC"
         titleHighlight="Works"
         subtitle="A transparent, step-by-step look at the journey from sign-up to earning — no guesswork, no surprises."
         breadcrumb={[{ label: "How It Works", href: "/how-it-works" }]}

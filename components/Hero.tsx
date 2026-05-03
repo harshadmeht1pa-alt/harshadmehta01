@@ -154,7 +154,7 @@ export default function Hero() {
             variants={fadeUpItem}
             className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8"
           >
-            <MagneticButton href="#" primary>
+            <MagneticButton href="/auth" primary>
               <TrendingUp className="w-4 h-4" />
               Start Earning Now
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />

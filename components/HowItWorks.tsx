@@ -79,7 +79,7 @@ export default function HowItWorks() {
           </div>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-display text-white leading-tight mb-4" style={{ fontWeight: 800 }}>
             How{" "}
-            <span className="text-gradient-blue">NexaAI Works</span>
+            <span className="text-gradient-blue">RPC Works</span>
           </h2>
           <p className="text-brand-muted text-base sm:text-lg max-w-xl mx-auto">
             Three steps to launch your earning journey — no prior experience or technical knowledge required.

@@ -75,7 +75,7 @@ export default function FeaturesPage() {
         badgeColor="blue"
         title="Everything You Need"
         titleHighlight="to Succeed"
-        subtitle="NexaAI combines cutting-edge AI signals, proven earning strategies, and a thriving community to give you every advantage on your earning journey."
+        subtitle="RPC combines cutting-edge AI signals, proven earning strategies, and a thriving community to give you every advantage on your earning journey."
         breadcrumb={[{ label: "Features", href: "/features" }]}
       />
 
@@ -123,7 +123,7 @@ export default function FeaturesPage() {
             >
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-brand-green/25 bg-brand-green/10 text-brand-green text-xs font-medium mb-5">
                 <Zap className="w-3.5 h-3.5" />
-                Why Choose NexaAI
+                Why Choose RPC
               </div>
               <h2 className="text-3xl sm:text-4xl font-display text-white mb-5 leading-tight" style={{ fontWeight: 800 }}>
                 AI-Guided Learning,{" "}

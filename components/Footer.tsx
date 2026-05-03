@@ -1,41 +1,29 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Zap, Twitter, Instagram, Youtube, Mail } from "lucide-react";
+import { Zap } from "lucide-react";
 
 const footerLinks: Record<string, { label: string; href: string }[]> = {
   Platform: [
     { label: "Features",      href: "/features" },
     { label: "How It Works",  href: "/how-it-works" },
     { label: "Pricing",       href: "/pricing" },
-    { label: "FAQ",           href: "/faq" },
   ],
   Support: [
     { label: "Contact Us",  href: "/contact" },
     { label: "Help Center", href: "/help" },
-    { label: "Community",   href: "/community" },
-    { label: "Status",      href: "/status" },
   ],
   Legal: [
     { label: "Terms of Service", href: "/legal/terms" },
     { label: "Privacy Policy",   href: "/legal/privacy" },
-    { label: "Refund Policy",    href: "/legal/refund" },
-    { label: "Disclaimer",       href: "/legal/disclaimer" },
+    { label: "Disclaimer",       href: "/disclaimer" },
   ],
   Company: [
     { label: "About Us", href: "/about" },
-    { label: "Blog",     href: "/blog" },
-    { label: "Careers",  href: "/careers" },
-    { label: "Press",    href: "/press" },
   ],
 };
 
-const socials = [
-  { icon: Twitter,   label: "Twitter" },
-  { icon: Instagram, label: "Instagram" },
-  { icon: Youtube,   label: "YouTube" },
-  { icon: Mail,      label: "Email" },
-];
+
 
 const sectionContainer = {
   hidden: { opacity: 0 },
@@ -65,26 +53,14 @@ export default function Footer() {
               <div className="w-8 h-8 rounded-lg bg-brand-blue flex items-center justify-center shadow-glow-sm">
                 <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
               </div>
-              <span className="text-white font-display text-lg" style={{ fontWeight: 700 }}>
-                Nexa<span className="text-brand-blue">AI</span>
+              <span className="text-white font-display text-lg tracking-widest" style={{ fontWeight: 700 }}>
+                RPC
               </span>
             </div>
             <p className="text-brand-dim text-xs leading-relaxed mb-5 max-w-[180px]">
               India's most advanced AI-powered earning education platform.
             </p>
-            <div className="flex items-center gap-3">
-              {socials.map(({ icon: Icon, label }) => (
-                <a
-                  key={label}
-                  href="#"
-                  aria-label={label}
-                  className="w-8 h-8 rounded-lg bg-brand-bgLight border border-brand-border flex items-center justify-center
-                    hover:border-brand-blue/50 hover:bg-brand-blue/10 transition-all duration-200 group"
-                >
-                  <Icon className="w-3.5 h-3.5 text-brand-dim group-hover:text-brand-blue" strokeWidth={1.8} />
-                </a>
-              ))}
-            </div>
+
           </motion.div>
 
           {/* Link columns */}
@@ -118,11 +94,11 @@ export default function Footer() {
           transition={{ delay: 0.3, duration: 0.5 }}
         >
           <p className="text-brand-dim text-xs text-center sm:text-left">
-            © {new Date().getFullYear()} NexaAI. All rights reserved.
+            © {new Date().getFullYear()} RPC. All rights reserved.
           </p>
           <p className="text-brand-dim text-xs text-center sm:text-right">
             Educational platform only. No guaranteed returns.{" "}
-            <a href="/legal/disclaimer" className="hover:text-brand-muted underline underline-offset-2 transition-colors">
+            <a href="/disclaimer" className="hover:text-brand-muted underline underline-offset-2 transition-colors">
               Read Disclaimer
             </a>
           </p>

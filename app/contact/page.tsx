@@ -47,7 +47,7 @@ export default function ContactPage() {
                 <Mail className="w-4 h-4 text-brand-blue" strokeWidth={1.8} />
               </div>
               <div className="text-white font-semibold text-sm mb-1">Email Support</div>
-              <a href="mailto:support@nexaai.in" className="text-brand-blue hover:text-brand-blueBright text-xs underline underline-offset-2 transition-colors">support@nexaai.in</a>
+              <a href="mailto:support@RPC.in" className="text-brand-blue hover:text-brand-blueBright text-xs underline underline-offset-2 transition-colors">support@RPC.in</a>
             </div>
 
             <div className="glass-card rounded-xl2 border border-brand-border p-5">

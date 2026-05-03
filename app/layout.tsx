@@ -17,7 +17,7 @@ const syne = Syne({
 });
 
 export const metadata: Metadata = {
-  title: "NexaAI — AI-Powered Earning & Education Platform",
+  title: "RPC — AI-Powered Earning & Education Platform",
   description:
     "India's #1 AI-powered earning education platform. Unlock ₹60–₹125/day earning potential with intelligent AI-driven strategies. Start your financial journey today.",
   keywords: "AI earning platform India, online earning India, AI education, passive income India",

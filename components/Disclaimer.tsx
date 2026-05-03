@@ -26,7 +26,7 @@ export default function Disclaimer() {
               </h3>
               <div className="space-y-2 text-brand-dim text-xs sm:text-sm leading-relaxed">
                 <p>
-                  <strong className="text-brand-muted">Important Notice:</strong> NexaAI is an educational
+                  <strong className="text-brand-muted">Important Notice:</strong> RPC is an educational
                   and strategy-based platform. All earning figures displayed — ₹60/day, ₹95/day, ₹125/day —
                   represent <em>indicative potential only</em> and do not constitute guaranteed returns of any kind.
                 </p>
@@ -42,11 +42,8 @@ export default function Disclaimer() {
                   conditions, and prior knowledge.
                 </p>
                 <p>
-                  NexaAI is not registered with, licensed by, or affiliated with SEBI, RBI, or any financial
-                  regulatory authority. Its services must not be construed as regulated financial services.{" "}
-                  <a href="/legal/disclaimer" className="text-brand-gold/80 hover:text-brand-gold underline underline-offset-2 transition-colors">
-                    Read full disclaimer →
-                  </a>
+                  RPC is not registered with, licensed by, or affiliated with SEBI, RBI, or any financial
+                  regulatory authority. Its services must not be construed as regulated financial services.
                 </p>
               </div>
             </div>

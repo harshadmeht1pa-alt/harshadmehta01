@@ -8,7 +8,7 @@ import {
 } from "framer-motion";
 import { Zap } from "lucide-react";
 
-const navLinks = ["Features", "How It Works", "Pricing", "FAQ"];
+const navLinks = ["Features", "How It Works", "Pricing"];
 
 const navItemVariants = {
   hidden: { opacity: 0, y: -8 },
@@ -23,7 +23,6 @@ const linkHrefs: Record<string, string> = {
   Features: "/features",
   "How It Works": "/how-it-works",
   Pricing: "/pricing",
-  FAQ: "/faq",
 };
 
 export default function Navbar() {
@@ -61,8 +60,8 @@ export default function Navbar() {
           >
             <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
           </motion.div>
-          <span className="text-white font-display text-lg" style={{ fontWeight: 700 }}>
-            Nexa<span className="text-brand-blue">AI</span>
+          <span className="text-white font-display text-lg tracking-widest" style={{ fontWeight: 700 }}>
+            RPC
           </span>
         </a>
 
@@ -88,7 +87,7 @@ export default function Navbar() {
 
         {/* CTA */}
         <motion.a
-          href="/pricing"
+          href="/auth"
           className="relative inline-flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold text-white overflow-hidden
             bg-brand-blue hover:bg-brand-blueBright transition-colors duration-200 shadow-glow-sm hover:shadow-glow-md"
           whileHover={{ scale: 1.04 }}

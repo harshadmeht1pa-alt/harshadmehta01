@@ -170,7 +170,7 @@ function PricingCard({ plan, index }: { plan: PlanDef; index: number }) {
 
         {/* CTA */}
         <a
-          href="/pricing"
+          href="/auth"
           className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm transition-all duration-200 mb-7 ${plan.btnClass}`}
           style={{ fontWeight: 700 }}
         >

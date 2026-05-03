@@ -11,7 +11,7 @@ const rowA = [
   { icon: TrendingUp,  text: "Rahul K. — ₹3,800 This Week" },
   { icon: Star,        text: "4.9/5 Average Rating" },
   { icon: Zap,         text: "AI Signals — 89% Accuracy" },
-  { icon: Users,       text: "Priya S. just joined NexaAI" },
+  { icon: Users,       text: "Priya S. just joined RPC" },
   { icon: IndianRupee, text: "₹125/day — Elite Plan Members" },
   { icon: TrendingUp,  text: "Amit V. — ₹2,100 Today" },
   { icon: Star,        text: "Top Rated AI Platform 2024" },

@@ -21,7 +21,7 @@ const allArticles = [
   { title: "How to upgrade from Starter to Growth or Elite plan",   category: "Account & Billing",  reading: "2 min" },
   { title: "Troubleshooting login issues on mobile browsers",        category: "Technical Issues",    reading: "3 min" },
   { title: "How the live AI analysis sessions work",                 category: "Platform Features",  reading: "4 min" },
-  { title: "Is NexaAI registered with SEBI or RBI?",                category: "Safety & Compliance", reading: "2 min" },
+  { title: "Is RPC registered with SEBI or RBI?",                category: "Safety & Compliance", reading: "2 min" },
   { title: "Setting up your profile and earning preferences",        category: "Getting Started",    reading: "4 min" },
   { title: "How to submit a refund request",                         category: "Account & Billing",  reading: "2 min" },
 ];

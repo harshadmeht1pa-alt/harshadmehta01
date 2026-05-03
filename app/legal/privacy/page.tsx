@@ -24,7 +24,7 @@ export default function PrivacyPage() {
         badgeColor="blue"
         title="Privacy"
         titleHighlight="Policy"
-        subtitle="Last updated: May 1, 2026. This policy explains how NexaAI collects, uses, and protects your personal information in compliance with the Information Technology Act, 2000."
+        subtitle="Last updated: May 1, 2026. This policy explains how RPC collects, uses, and protects your personal information in compliance with the Information Technology Act, 2000."
         breadcrumb={[{ label: "Privacy Policy", href: "/legal/privacy" }]}
       />
 
@@ -50,7 +50,7 @@ export default function PrivacyPage() {
 
           {/* Content */}
           <div className="space-y-10 text-sm leading-relaxed">
-            <p className="text-brand-muted">NexaAI Education Technologies Pvt. Ltd. (&ldquo;NexaAI&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;, or &ldquo;our&rdquo;) is committed to protecting your personal information. This Privacy Policy is published in compliance with the Information Technology Act, 2000 (&ldquo;IT Act&rdquo;), the Information Technology (Amendment) Act, 2008, and the Information Technology (Reasonable Security Practices and Procedures and Sensitive Personal Data or Information) Rules, 2011.</p>
+            <p className="text-brand-muted">RPC Education Technologies Pvt. Ltd. (&ldquo;RPC&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;, or &ldquo;our&rdquo;) is committed to protecting your personal information. This Privacy Policy is published in compliance with the Information Technology Act, 2000 (&ldquo;IT Act&rdquo;), the Information Technology (Amendment) Act, 2008, and the Information Technology (Reasonable Security Practices and Procedures and Sensitive Personal Data or Information) Rules, 2011.</p>
 
             <section id="priv-1">
               <h2 className="text-white font-semibold text-base mb-3">1. Information We Collect</h2>
@@ -139,7 +139,7 @@ export default function PrivacyPage() {
                 <li><strong className="text-white">Opt-out:</strong> Unsubscribe from marketing communications at any time via the link in any email or by contacting us.</li>
                 <li><strong className="text-white">Withdraw Consent:</strong> Withdraw consent for data processing where consent is the legal basis, without affecting prior processing.</li>
               </ul>
-              <p className="text-brand-muted mt-3">To exercise any of these rights, contact our Data Grievance Officer at <strong className="text-white">privacy@nexaai.in</strong>. We will respond within 30 days.</p>
+              <p className="text-brand-muted mt-3">To exercise any of these rights, contact our Data Grievance Officer at <strong className="text-white">privacy@RPC.in</strong>. We will respond within 30 days.</p>
             </section>
             <div className="h-px bg-brand-border/50" />
 
@@ -159,7 +159,7 @@ export default function PrivacyPage() {
 
             <section id="priv-8">
               <h2 className="text-white font-semibold text-base mb-3">8. Children&rsquo;s Privacy</h2>
-              <p className="text-brand-muted">NexaAI is not intended for use by persons under the age of 18. We do not knowingly collect personal information from minors. If we become aware that we have collected data from a person under 18, we will delete that data promptly. If you believe we have inadvertently collected such information, please contact us at privacy@nexaai.in.</p>
+              <p className="text-brand-muted">RPC is not intended for use by persons under the age of 18. We do not knowingly collect personal information from minors. If we become aware that we have collected data from a person under 18, we will delete that data promptly. If you believe we have inadvertently collected such information, please contact us at privacy@RPC.in.</p>
             </section>
             <div className="h-px bg-brand-border/50" />
 
@@ -174,8 +174,8 @@ export default function PrivacyPage() {
               <p className="text-brand-muted mb-3">In accordance with the Information Technology Act, 2000, and the IT Rules, 2011, we have appointed a Data Grievance Officer to address privacy-related concerns:</p>
               <div className="glass-card rounded-xl p-5 border border-brand-border">
                 <div className="space-y-1.5 text-sm">
-                  <div><span className="text-brand-dim">Name:</span> <span className="text-white font-semibold">Data Grievance Officer, NexaAI</span></div>
-                  <div><span className="text-brand-dim">Email:</span> <a href="mailto:privacy@nexaai.in" className="text-brand-blue hover:text-brand-blueBright underline underline-offset-2">privacy@nexaai.in</a></div>
+                  <div><span className="text-brand-dim">Name:</span> <span className="text-white font-semibold">Data Grievance Officer, RPC</span></div>
+                  <div><span className="text-brand-dim">Email:</span> <a href="mailto:privacy@RPC.in" className="text-brand-blue hover:text-brand-blueBright underline underline-offset-2">privacy@RPC.in</a></div>
                   <div><span className="text-brand-dim">Response Time:</span> <span className="text-brand-muted">Within 30 days of receiving your grievance.</span></div>
                 </div>
               </div>

@@ -9,7 +9,7 @@ import { Shield, Zap, Users, BookOpen, ArrowRight } from "lucide-react";
 const values = [
   { icon: Shield,   title: "Transparency", description: "We are transparent about what our platform is and what it is not. All earning figures are indicative. All limitations are disclosed upfront." },
   { icon: Zap,      title: "Innovation",   description: "We continuously improve our AI models and strategy frameworks to give members access to the most current and effective earning guidance available." },
-  { icon: Users,    title: "Community",    description: "We believe learning is better together. Our 12,400+ member community is the backbone of NexaAI — collaborative, supportive, and growth-focused." },
+  { icon: Users,    title: "Community",    description: "We believe learning is better together. Our 12,400+ member community is the backbone of RPC — collaborative, supportive, and growth-focused." },
   { icon: BookOpen, title: "Education First", description: "We are educators first, technology company second. Every feature we build serves one goal: helping members learn more effectively and earn more consistently." },
 ];
 
@@ -36,7 +36,7 @@ export default function AboutPage() {
         badgeColor="blue"
         title="Building India's"
         titleHighlight="AI Earning Future"
-        subtitle="We started NexaAI with a simple belief: every Indian deserves access to intelligent earning strategies and the education to use them effectively."
+        subtitle="We started RPC with a simple belief: every Indian deserves access to intelligent earning strategies and the education to use them effectively."
         breadcrumb={[{ label: "About Us", href: "/about" }]}
       />
 
@@ -125,9 +125,9 @@ export default function AboutPage() {
         {/* CTA */}
         <div className="text-center">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}>
-            <h3 className="text-white font-semibold text-xl mb-3">Join the NexaAI Community</h3>
+            <h3 className="text-white font-semibold text-xl mb-3">Join the RPC Community</h3>
             <p className="text-brand-muted text-sm mb-6">Be part of India&rsquo;s fastest-growing AI earning education platform.</p>
-            <a href="/pricing" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-blue hover:bg-brand-blueBright text-white font-semibold text-sm shadow-glow-md transition-colors">
+            <a href="/auth" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-blue hover:bg-brand-blueBright text-white font-semibold text-sm shadow-glow-md transition-colors">
               Get Started <ArrowRight className="w-4 h-4" />
             </a>
           </motion.div>
