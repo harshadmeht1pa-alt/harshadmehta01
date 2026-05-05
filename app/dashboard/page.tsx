@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
-import { Wallet, TrendingUp, IndianRupee, ArrowUpRight, Zap, History, Users, Send, CheckCircle2, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Wallet, TrendingUp, IndianRupee, ArrowUpRight, Zap, History, Users, Send, AlertCircle, Loader2, LogOut, Check, MessageSquare } from "lucide-react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
 type TimeRange = "Today" | "Monthly" | "Yearly" | "All Time";
 
@@ -14,100 +15,281 @@ const EARNINGS_DATA: Record<TimeRange, number> = {
   "All Time": 54000,
 };
 
-const TOTAL_INVESTMENT = 5000;
-
 export default function Dashboard() {
-  const [userStatus, setUserStatus] = useState<"loading" | "no_plan" | "chatting" | "pending" | "active">("loading");
-  const [selectedPlan, setSelectedPlan] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<any>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>("Today");
-  const [chatMessages, setChatMessages] = useState<{sender: string, text: string}[]>([]);
-  const [chatInput, setChatInput] = useState("");
   
-  useEffect(() => {
-    const status = localStorage.getItem("rpc_user_status") as any || "no_plan";
-    setUserStatus(status);
-    setSelectedPlan(localStorage.getItem("rpc_selected_plan") || "");
-    
-    try {
-      const msgs = JSON.parse(localStorage.getItem("rpc_chat_messages") || "[]");
-      setChatMessages(msgs);
-    } catch(e) {}
+  // Chat States
+  const [chat, setChat] = useState<any>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-    const handleStorage = () => {
-      const newStatus = localStorage.getItem("rpc_user_status") as any;
-      if (newStatus) setUserStatus(newStatus);
-      try {
-        const msgs = JSON.parse(localStorage.getItem("rpc_chat_messages") || "[]");
-        setChatMessages(msgs);
-      } catch(e) {}
+  // Withdrawal States
+  const [showWithdrawForm, setShowWithdrawForm] = useState(false);
+  const [withdrawSuccess, setWithdrawSuccess] = useState(false);
+  const [withdrawMethod, setWithdrawMethod] = useState<'upi' | 'qr' | 'bank'>('upi');
+  const [bankDetails, setBankDetails] = useState({ holder: "", upiId: "", account: "", ifsc: "", amount: "", qrImage: "" });
+  const [chatHistory, setChatHistory] = useState<any[]>([]);
+
+  useEffect(() => {
+    let userId: string | null = null;
+
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        userId = session.user.id;
+      }
+      await fetchUserData();
     };
-    window.addEventListener("storage", handleStorage);
-    const interval = setInterval(handleStorage, 1000);
-    
+    init();
+
+    // Real-time subscription for profile changes (Plan access, balance updates, etc.)
+    const profileSubscription = supabase
+      .channel(`profile_updates_${Math.random()}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'profiles' 
+      }, (payload: any) => {
+        // Only update if it's the current user — use cached userId (no lock contention)
+        if (userId && payload.new.id === userId) {
+          setProfile(payload.new);
+          // Plan was just assigned — clear plan purchase chat
+          if (payload.new.current_plan !== 'None') {
+            setChat((prev: any) => prev?.type === 'plan_purchase' ? null : prev);
+          }
+        }
+      })
+      .subscribe();
+
     return () => {
-      window.removeEventListener("storage", handleStorage);
-      clearInterval(interval);
+      supabase.removeChannel(profileSubscription);
     };
   }, []);
 
-  const setStatus = (status: string) => {
-    localStorage.setItem("rpc_user_status", status);
-    setUserStatus(status as any);
-  };
-
-  const addMessage = (sender: string, text: string) => {
-    // Need fresh state from localStorage to prevent overwriting
-    const currentMsgs = JSON.parse(localStorage.getItem("rpc_chat_messages") || "[]");
-    const newMsgs = [...currentMsgs, { sender, text }];
-    setChatMessages(newMsgs);
-    localStorage.setItem("rpc_chat_messages", JSON.stringify(newMsgs));
+  const fetchUserData = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
     
-    // Simulate auto-replies
-    if (sender === "user" && text.includes("want to purchase")) {
-      setTimeout(() => {
-        const plan = localStorage.getItem("rpc_selected_plan") || "Starter";
-        const price = plan === 'Starter' ? 999 : plan === 'Growth' ? 2999 : 4999;
-        
-        const msgs1 = JSON.parse(localStorage.getItem("rpc_chat_messages") || "[]");
-        const newMsgs1 = [...msgs1, { sender: "admin", text: `Sure! Please pay ₹${price} using this QR code.` }];
-        localStorage.setItem("rpc_chat_messages", JSON.stringify(newMsgs1));
-        setChatMessages(newMsgs1);
-
-        setTimeout(() => {
-          const msgs2 = JSON.parse(localStorage.getItem("rpc_chat_messages") || "[]");
-          const newMsgs2 = [...msgs2, { sender: "admin", text: "[QR_CODE_IMAGE]" }];
-          localStorage.setItem("rpc_chat_messages", JSON.stringify(newMsgs2));
-          setChatMessages(newMsgs2);
-        }, 500);
-
-      }, 1000);
-    } else if (sender === "user" && text === "[Screenshot Attached]") {
-      setTimeout(() => {
-        const msgs1 = JSON.parse(localStorage.getItem("rpc_chat_messages") || "[]");
-        const newMsgs1 = [...msgs1, { sender: "admin", text: "Thank you! Your payment will be approved within 24 hours." }];
-        localStorage.setItem("rpc_chat_messages", JSON.stringify(newMsgs1));
-        setChatMessages(newMsgs1);
-
-        setTimeout(() => setStatus("pending"), 2000);
-      }, 1500);
+    if (!user) {
+      window.location.href = "/auth";
+      return;
     }
+
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    setProfile(profileData);
+
+    // Only auto-load chat if user has NO plan (plan purchase flow)
+    // Users with active plans see dashboard by default — chat only shows when they click Deposit
+    if (profileData && profileData.current_plan === "None") {
+      const { data: chatData } = await supabase
+        .from("chats")
+        .select("*")
+        .eq("user_id", user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (chatData) {
+        setChat(chatData);
+        fetchMessages(chatData.id);
+      } else {
+        setChat(null);
+        setChatMessages([]);
+      }
+    } else {
+      // User has plan — clear any leftover chat state so dashboard shows
+      setChat(null);
+      setChatMessages([]);
+    }
+
+    // Fetch chat history
+    const { data: historyData } = await supabase
+      .from("chats")
+      .select("*")
+      .eq("user_id", user.id)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    if (historyData) setChatHistory(historyData);
+    
+    setLoading(false);
   };
 
-  const handleSelectPlan = (plan: string) => {
-    setSelectedPlan(plan);
-    localStorage.setItem("rpc_selected_plan", plan);
-    setStatus("chatting");
-    const initMsg = `Hi, I want to purchase the ${plan} plan.`;
-    setChatInput(initMsg);
+  const fetchMessages = async (chatId: string) => {
+    const { data } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("chat_id", chatId)
+      .order('created_at', { ascending: true });
+    if (data) setChatMessages(data);
   };
 
-  const handleSendChat = () => {
-    if (!chatInput) return;
-    addMessage("user", chatInput);
+  const handleSelectPlan = async (plan: string) => {
+    if (!profile) return;
+    setLoading(true);
+    
+    // 1. Create Chat for plan purchase
+    const insertObj: any = { user_id: profile.id, status: 'pending_payment' };
+    try { insertObj.type = 'plan_purchase'; } catch(e) {}
+    const { data: chatData, error: chatError } = await supabase
+      .from("chats")
+      .insert([insertObj])
+      .select()
+      .single();
+
+    if (chatError) {
+      console.error(chatError);
+      setLoading(false);
+      return;
+    }
+
+    setChat(chatData);
+    
+    const price = plan === 'Starter' ? 999 : plan === 'Growth' ? 2999 : 4999;
+    await supabase.from("messages").insert([
+      { chat_id: chatData.id, sender_id: profile.id, content: `Hi, I want to purchase the ${plan} plan.` }
+    ]);
+
+    setTimeout(async () => {
+      await supabase.from("messages").insert([
+        { chat_id: chatData.id, sender_id: null, content: `Sure! Please pay ₹${price} using this QR code.` },
+        { chat_id: chatData.id, sender_id: null, content: "[QR_CODE_IMAGE]" }
+      ]);
+    }, 1000);
+
+    fetchMessages(chatData.id);
+    setLoading(false);
+  };
+
+  const handleDepositRequest = async () => {
+    if (!profile) return;
+    setLoading(true);
+    
+    // Create Chat for deposit
+    const insertObj: any = { user_id: profile.id, status: 'pending_payment' };
+    try { insertObj.type = 'deposit'; } catch(e) {}
+    const { data: chatData, error: chatError } = await supabase
+      .from("chats")
+      .insert([insertObj])
+      .select()
+      .single();
+
+    if (chatError) {
+      console.error(chatError);
+      alert('Error creating chat: ' + chatError.message);
+      setLoading(false);
+      return;
+    }
+
+    setChat(chatData);
+    await supabase.from("messages").insert([
+      { chat_id: chatData.id, sender_id: profile.id, content: `Hi, I want to deposit money into my balance.` }
+    ]);
+
+    setTimeout(async () => {
+      await supabase.from("messages").insert([
+        { chat_id: chatData.id, sender_id: null, content: `Hello! Please send the amount you want to deposit to our UPI ID and share the screenshot here. Your balance will be updated soon.` },
+        { chat_id: chatData.id, sender_id: null, content: "[QR_CODE_IMAGE]" }
+      ]);
+    }, 1000);
+
+    fetchMessages(chatData.id);
+    setLoading(false);
+  };
+
+  const handleWithdrawSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile || Number(bankDetails.amount) > profile.earnings_balance || Number(bankDetails.amount) <= 0) {
+      alert("Invalid amount or insufficient balance!");
+      return;
+    }
+    
+    let detailsStr = '';
+    if (withdrawMethod === 'upi') {
+      detailsStr = JSON.stringify({ method: 'UPI', holder: bankDetails.holder, upiId: bankDetails.upiId, amount: bankDetails.amount });
+    } else if (withdrawMethod === 'bank') {
+      detailsStr = JSON.stringify({ method: 'Bank', holder: bankDetails.holder, account: bankDetails.account, ifsc: bankDetails.ifsc, amount: bankDetails.amount });
+    } else {
+      detailsStr = JSON.stringify({ method: 'QR', holder: bankDetails.holder, qrNote: 'QR code shared by user', amount: bankDetails.amount });
+    }
+
+    setLoading(true);
+    const { error } = await supabase
+      .from("withdrawals")
+      .insert([{
+        user_id: profile.id,
+        amount: Number(bankDetails.amount),
+        status: 'pending',
+        details: detailsStr
+      }]);
+
+    if (!error) {
+      setWithdrawSuccess(true);
+      setShowWithdrawForm(false);
+      setBankDetails({ holder: '', upiId: '', account: '', ifsc: '', amount: '', qrImage: '' });
+    } else {
+      alert(error.message);
+    }
+    setLoading(false);
+  };
+
+  const handleSendChat = async () => {
+    if (!chatInput || !chat || !profile) return;
+    const text = chatInput;
     setChatInput("");
+    await supabase.from("messages").insert([
+      { chat_id: chat.id, sender_id: profile.id, content: text }
+    ]);
   };
 
-  if (userStatus === "loading") return <div className="min-h-screen bg-brand-bg text-white flex items-center justify-center">Loading...</div>;
+  const handleFileUpload = async (e: any) => {
+    const file = e.target.files[0];
+    if (!file || !chat || !profile) return;
+    
+    setUploading(true);
+    const fileName = `${profile.id}/${Date.now()}-${file.name}`;
+    
+    const { data, error } = await supabase.storage
+      .from('payments')
+      .upload(fileName, file);
+
+    if (error) {
+      alert("Error uploading file: " + error.message);
+      setUploading(false);
+      return;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('payments')
+      .getPublicUrl(fileName);
+
+    await supabase.from("messages").insert([
+      { chat_id: chat.id, sender_id: profile.id, content: "[Screenshot Attached]", image_url: publicUrl }
+    ]);
+
+    setTimeout(async () => {
+      await supabase.from("messages").insert([
+        { chat_id: chat.id, sender_id: null, content: "Thank you! Your payment/deposit screenshot is received. It will be verified and approved within 24 hours." }
+      ]);
+    }, 1000);
+
+    setUploading(false);
+  };
+
+  if (loading && !profile) return (
+    <div className="min-h-screen bg-brand-bg text-white flex flex-col items-center justify-center gap-4">
+      <Loader2 className="w-10 h-10 text-brand-blue animate-spin" />
+      <p className="text-brand-muted animate-pulse">Syncing with server...</p>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-brand-bg text-white">
@@ -122,14 +304,10 @@ export default function Dashboard() {
             <span className="font-display text-lg tracking-widest font-bold">RPC</span>
           </Link>
           <div className="flex items-center gap-4">
-            <button onClick={() => {
-              // RESET BUTTON FOR TESTING
-              localStorage.removeItem("rpc_user_status");
-              localStorage.removeItem("rpc_chat_messages");
-              localStorage.removeItem("rpc_selected_plan");
-              window.location.reload();
-            }} className="text-xs text-brand-muted hover:text-white mr-4">Reset Demo</button>
-            <div className="w-9 h-9 rounded-full bg-brand-bgLight border border-brand-border flex items-center justify-center text-brand-blue font-bold">U</div>
+            <button onClick={() => setShowLogoutConfirm(true)} className="text-xs text-brand-muted hover:text-white mr-4 transition-colors">Sign Out</button>
+            <div className="w-9 h-9 rounded-full bg-brand-bgLight border border-brand-border flex items-center justify-center text-brand-blue font-bold">
+              {profile?.full_name?.charAt(0) || "U"}
+            </div>
           </div>
         </div>
       </header>
@@ -137,7 +315,7 @@ export default function Dashboard() {
       <main className="max-w-6xl mx-auto px-5 sm:px-8 py-10 relative z-10">
         
         {/* NO PLAN STATE */}
-        {userStatus === "no_plan" && (
+        {profile && profile.current_plan === "None" && !chat && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <div className="text-center mb-10">
               <h1 className="text-3xl font-display font-bold mb-2">Select a Plan</h1>
@@ -158,33 +336,43 @@ export default function Dashboard() {
         )}
 
         {/* CHATTING STATE */}
-        {userStatus === "chatting" && (
+        {profile && chat && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-2xl mx-auto">
             <div className="bg-brand-bgCard border border-brand-border rounded-xl3 overflow-hidden flex flex-col h-[600px]">
-              <div className="p-4 border-b border-brand-border bg-brand-bgLight font-semibold flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-brand-blue/20 flex items-center justify-center">
-                  <Zap className="w-5 h-5 text-brand-blue" />
+              <div className="p-4 border-b border-brand-border bg-brand-bgLight font-semibold flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-brand-blue/20 flex items-center justify-center">
+                    <Zap className="w-5 h-5 text-brand-blue" />
+                  </div>
+                  <div>
+                    <div className="text-white">RPC Support</div>
+                    <div className="text-xs text-brand-green">Online</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-white">RPC Support</div>
-                  <div className="text-xs text-brand-green">Online</div>
+                <div className="flex flex-col items-end">
+                    <div className="text-[10px] bg-yellow-500/10 text-yellow-500 px-2 py-1 rounded-md border border-yellow-500/20 uppercase font-bold tracking-wider mb-1">
+                      {chat.type === 'deposit' ? 'Deposit Review' : 'Payment Review'}
+                    </div>
+                    {profile.current_plan !== "None" && (
+                        <button onClick={() => setChat(null)} className="text-[10px] text-brand-muted hover:text-white underline">Back to Dashboard</button>
+                    )}
                 </div>
               </div>
               <div className="flex-1 p-4 overflow-y-auto space-y-4">
-                {chatMessages.length === 0 && (
-                  <div className="text-center text-brand-muted text-sm mt-10">Start the conversation to purchase the {selectedPlan} plan.</div>
-                )}
                 {chatMessages.map((msg, i) => (
-                  <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[75%] p-3 rounded-xl text-sm ${msg.sender === 'user' ? 'bg-brand-blue text-white rounded-tr-none' : 'bg-brand-bgLight border border-brand-border text-brand-muted rounded-tl-none'}`}>
-                      {msg.text === "[QR_CODE_IMAGE]" ? (
+                  <div key={i} className={`flex ${msg.sender_id === profile.id ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[75%] p-3 rounded-xl text-sm ${msg.sender_id === profile.id ? 'bg-brand-blue text-white rounded-tr-none' : 'bg-brand-bgLight border border-brand-border text-brand-muted rounded-tl-none'}`}>
+                      {msg.content === "[QR_CODE_IMAGE]" ? (
                         <div className="w-48 h-48 bg-white rounded-lg flex items-center justify-center">
                           <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=rpc@ybl&pn=RPC" alt="QR" className="w-40 h-40" />
                         </div>
-                      ) : msg.text === "[Screenshot Attached]" ? (
-                        <div className="w-48 h-64 bg-brand-border rounded-lg flex items-center justify-center text-xs">Screenshot.png</div>
+                      ) : msg.content === "[Screenshot Attached]" ? (
+                        <div className="space-y-2">
+                          <img src={msg.image_url} alt="Screenshot" className="w-48 rounded-lg" />
+                          <div className="text-[10px] opacity-70">Payment Screenshot Attached</div>
+                        </div>
                       ) : (
-                        msg.text
+                        msg.content
                       )}
                     </div>
                   </div>
@@ -192,13 +380,15 @@ export default function Dashboard() {
               </div>
               <div className="p-4 border-t border-brand-border bg-brand-bgLight">
                 <div className="flex gap-2">
-                  <button onClick={() => addMessage("user", "[Screenshot Attached]")} className="px-4 bg-brand-bg border border-brand-border rounded-xl text-xs font-semibold hover:border-brand-blue transition-colors">
-                    Upload Screenshot
-                  </button>
+                  <label className="cursor-pointer px-4 bg-brand-bg border border-brand-border rounded-xl text-xs font-semibold hover:border-brand-blue transition-colors flex items-center">
+                    {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Upload Screenshot"}
+                    <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} disabled={uploading} />
+                  </label>
                   <input
                     type="text"
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
                     placeholder="Type a message..."
                     className="flex-1 bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-brand-blue text-sm"
                   />
@@ -211,24 +401,19 @@ export default function Dashboard() {
           </motion.div>
         )}
 
-        {/* PENDING STATE */}
-        {userStatus === "pending" && (
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-md mx-auto text-center mt-20">
-            <div className="w-20 h-20 bg-yellow-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <AlertCircle className="w-10 h-10 text-yellow-500" />
-            </div>
-            <h2 className="text-2xl font-bold mb-3">Payment Under Review</h2>
-            <p className="text-brand-muted">We have received your payment screenshot. Our team will verify and activate your <strong>{selectedPlan}</strong> plan within 24 hours.</p>
-          </motion.div>
-        )}
-
-        {/* ACTIVE STATE (Original Dashboard) */}
-        {userStatus === "active" && (
+        {/* ACTIVE STATE */}
+        {profile && profile.current_plan !== "None" && !chat && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <div className="mb-10">
-              <h1 className="text-3xl sm:text-4xl font-display font-bold mb-2">Welcome Back!</h1>
-              <p className="text-brand-muted">Here is your earning and investment overview.</p>
+            <div className="mb-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-3xl sm:text-4xl font-display font-bold mb-2">Welcome Back, {profile.full_name}!</h1>
+                <p className="text-brand-muted">Here is your earning and investment overview.</p>
+              </div>
+              <div className="px-4 py-2 bg-brand-blue/10 border border-brand-blue/20 rounded-xl text-brand-blueBright font-bold text-sm">
+                PLAN: {profile.current_plan}
+              </div>
             </div>
+
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 glass-card bg-brand-bgCard border border-brand-border rounded-xl3 p-6 sm:p-8 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-brand-blue opacity-5 blur-3xl rounded-full" />
@@ -244,16 +429,17 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="relative z-10">
-                  <p className="text-brand-dim text-sm mb-1">{timeRange} Earnings</p>
+                  <p className="text-brand-dim text-sm mb-1">Current Wallet Balance</p>
                   <div className="flex items-baseline gap-2">
                     <IndianRupee className="w-8 h-8 text-brand-blueBright" strokeWidth={2} />
-                    <span className="text-5xl sm:text-6xl font-display font-bold text-white tracking-tight">{EARNINGS_DATA[timeRange].toLocaleString("en-IN")}</span>
+                    <span className="text-5xl sm:text-6xl font-display font-bold text-white tracking-tight">{profile.earnings_balance.toLocaleString("en-IN")}</span>
                   </div>
                   <div className="mt-4 flex items-center gap-2 text-xs font-medium text-brand-green bg-brand-green/10 px-3 py-1.5 rounded-full w-fit">
-                    <ArrowUpRight className="w-3.5 h-3.5" />+12.5% vs previous period
+                    <ArrowUpRight className="w-3.5 h-3.5" />Active earning system active
                   </div>
                 </div>
               </div>
+              
               <div className="flex flex-col gap-6">
                 <div className="glass-card bg-brand-bgCard border border-brand-border rounded-xl3 p-6 flex-1 flex flex-col justify-center relative overflow-hidden">
                   <div className="flex items-center gap-3 mb-4 relative z-10">
@@ -263,22 +449,29 @@ export default function Dashboard() {
                   <div className="relative z-10">
                     <div className="flex items-baseline gap-1">
                       <IndianRupee className="w-5 h-5 text-brand-gold" />
-                      <span className="text-3xl font-display font-bold text-white">{TOTAL_INVESTMENT.toLocaleString("en-IN")}</span>
+                      <span className="text-3xl font-display font-bold text-white">{profile.total_investment.toLocaleString("en-IN")}</span>
                     </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <button className="w-full bg-brand-blue hover:bg-brand-blueBright text-white py-3 px-4 rounded-xl2 flex flex-col items-center gap-1 transition-all">
+                  <button 
+                    onClick={handleDepositRequest}
+                    className="w-full bg-brand-blue hover:bg-brand-blueBright text-white py-3 px-4 rounded-xl2 flex flex-col items-center gap-1 transition-all"
+                  >
                     <div className="flex items-center gap-2 font-semibold"><Zap className="w-4 h-4" />Deposit</div>
-                    <span className="text-[10px] text-white/80 font-medium tracking-wide">LIMIT: 50,000</span>
+                    <span className="text-[10px] text-white/80 font-medium">CHAT TO ADMIN</span>
                   </button>
-                  <button className="w-full bg-brand-bgLight border border-brand-border hover:border-brand-blue/50 text-white py-3 px-4 rounded-xl2 flex flex-col items-center gap-1 transition-all">
+                  <button 
+                    onClick={() => setShowWithdrawForm(true)}
+                    className="w-full bg-brand-bgLight border border-brand-border hover:border-brand-blue/50 text-white py-3 px-4 rounded-xl2 flex flex-col items-center gap-1 transition-all"
+                  >
                     <div className="flex items-center gap-2 font-semibold"><History className="w-4 h-4" />Withdrawal</div>
-                    <span className="text-[10px] text-brand-muted font-medium tracking-wide">LIMIT: 50,000</span>
+                    <span className="text-[10px] text-brand-muted font-medium">BANK FORM</span>
                   </button>
                 </div>
               </div>
             </div>
+
             <div className="mt-6 glass-card bg-brand-bgCard border border-brand-border rounded-xl3 p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 overflow-hidden relative group hover:border-brand-green/30 transition-colors">
               <div className="absolute top-0 right-0 w-48 h-48 bg-brand-green opacity-5 blur-3xl rounded-full" />
               <div className="flex items-center gap-4 relative z-10">
@@ -292,10 +485,158 @@ export default function Dashboard() {
                 Copy Invite Link
               </button>
             </div>
+
+            {/* CHAT HISTORY */}
+            <div className="mt-6 glass-card bg-brand-bgCard border border-brand-border rounded-xl3 p-6 sm:p-8 overflow-hidden">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-xl bg-brand-blue/20 flex items-center justify-center text-brand-blueBright"><MessageSquare className="w-5 h-5" /></div>
+                <h2 className="text-xl font-semibold">Chat History</h2>
+              </div>
+              {chatHistory.length > 0 ? (
+                <div className="space-y-3">
+                  {chatHistory.map((c) => (
+                    <div 
+                      key={c.id} 
+                      onClick={() => { setChat(c); fetchMessages(c.id); }}
+                      className="flex items-center justify-between p-4 bg-brand-bgLight border border-brand-border rounded-xl hover:border-brand-blue/40 cursor-pointer transition-all group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${c.type === 'deposit' ? 'bg-brand-gold/10 text-brand-gold' : 'bg-brand-blue/10 text-brand-blueBright'}`}>
+                          {c.type === 'deposit' ? <IndianRupee className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
+                        </div>
+                        <div>
+                          <div className="text-white text-sm font-medium">{c.type === 'deposit' ? 'Deposit Request' : 'Plan Purchase'}</div>
+                          <div className="text-[10px] text-brand-muted">{new Date(c.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${c.status === 'pending_payment' ? 'bg-yellow-500/10 text-yellow-500' : 'bg-brand-green/10 text-brand-green'}`}>{c.status === 'pending_payment' ? 'Pending' : c.status}</span>
+                        <span className="text-brand-muted text-xs group-hover:text-brand-blueBright transition-colors">View →</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-brand-muted text-sm">No conversations yet. Start a deposit or plan purchase to begin chatting.</div>
+              )}
+            </div>
           </motion.div>
         )}
 
+        {!profile && !loading && (
+          <div className="flex flex-col items-center justify-center py-20 text-center relative z-10">
+            <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+            <h2 className="text-2xl font-bold mb-2">Profile Not Found</h2>
+            <p className="text-brand-muted mb-6 text-sm max-w-md">
+              Your account exists but your profile data is missing.
+            </p>
+            <button 
+              onClick={() => supabase.auth.signOut().then(() => window.location.href = "/auth")}
+              className="bg-brand-blue hover:bg-brand-blueBright text-white px-6 py-2 rounded-xl transition-colors"
+            >
+              Back to Sign Up
+            </button>
+          </div>
+        )}
+
       </main>
+
+      {/* WITHDRAWAL FORM MODAL */}
+      <AnimatePresence>
+        {showWithdrawForm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowWithdrawForm(false)} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+            <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="relative w-full max-w-md bg-brand-bgCard border border-brand-border rounded-xl3 p-8 shadow-card overflow-hidden max-h-[90vh] overflow-y-auto">
+              <div className="absolute -top-12 -right-12 w-24 h-24 bg-brand-blue opacity-10 blur-2xl rounded-full" />
+              <h2 className="text-2xl font-display font-bold text-white mb-2 relative z-10">Withdraw Funds</h2>
+              <p className="text-brand-muted text-sm mb-6 relative z-10">Choose your preferred withdrawal method</p>
+              
+              {/* Method Tabs */}
+              <div className="flex p-1 rounded-xl bg-brand-bgLight border border-brand-border mb-6 relative z-10">
+                {(['upi', 'qr', 'bank'] as const).map((m) => (
+                  <button key={m} type="button" onClick={() => setWithdrawMethod(m)} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all uppercase tracking-wider ${withdrawMethod === m ? 'bg-brand-blue text-white shadow-glow-sm' : 'text-brand-muted hover:text-white'}`}>
+                    {m === 'upi' ? '📱 UPI ID' : m === 'qr' ? '📷 QR Code' : '🏦 Bank'}
+                  </button>
+                ))}
+              </div>
+
+              <form onSubmit={handleWithdrawSubmit} className="space-y-4 relative z-10">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-brand-muted ml-1">Account Holder Name</label>
+                  <input required value={bankDetails.holder} onChange={(e) => setBankDetails({...bankDetails, holder: e.target.value})} placeholder="Enter your full name" className="w-full bg-brand-bgLight border border-brand-border rounded-xl py-3 px-4 text-white focus:outline-none focus:border-brand-blue text-sm" />
+                </div>
+
+                {/* UPI Fields */}
+                {withdrawMethod === 'upi' && (
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-brand-muted ml-1">UPI ID</label>
+                    <input required value={bankDetails.upiId} onChange={(e) => setBankDetails({...bankDetails, upiId: e.target.value})} placeholder="example@paytm / example@ybl" className="w-full bg-brand-bgLight border border-brand-border rounded-xl py-3 px-4 text-white focus:outline-none focus:border-brand-blue text-sm" />
+                  </div>
+                )}
+
+                {/* QR Fields */}
+                {withdrawMethod === 'qr' && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-brand-muted ml-1">Upload Your QR Code</label>
+                    <div className="border-2 border-dashed border-brand-border rounded-xl p-6 text-center hover:border-brand-blue/50 transition-colors cursor-pointer">
+                      <input type="file" accept="image/*" onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) setBankDetails({...bankDetails, qrImage: file.name});
+                      }} className="hidden" id="qr-upload" />
+                      <label htmlFor="qr-upload" className="cursor-pointer">
+                        <div className="text-3xl mb-2">📷</div>
+                        <div className="text-white text-sm font-medium">{bankDetails.qrImage || 'Click to upload QR'}</div>
+                        <div className="text-brand-muted text-[10px] mt-1">Upload your payment QR code image</div>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* Bank Fields */}
+                {withdrawMethod === 'bank' && (
+                  <>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-brand-muted ml-1">Bank Account Number</label>
+                      <input required value={bankDetails.account} onChange={(e) => setBankDetails({...bankDetails, account: e.target.value})} placeholder="Enter account number" className="w-full bg-brand-bgLight border border-brand-border rounded-xl py-3 px-4 text-white focus:outline-none focus:border-brand-blue text-sm" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-brand-muted ml-1">IFSC Code</label>
+                      <input required value={bankDetails.ifsc} onChange={(e) => setBankDetails({...bankDetails, ifsc: e.target.value})} placeholder="e.g. SBIN0001234" className="w-full bg-brand-bgLight border border-brand-border rounded-xl py-3 px-4 text-white focus:outline-none focus:border-brand-blue text-sm" />
+                    </div>
+                  </>
+                )}
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-brand-muted ml-1">Amount (Available: ₹{profile?.earnings_balance})</label>
+                  <input type="number" required min="1" max={profile?.earnings_balance} value={bankDetails.amount} onChange={(e) => setBankDetails({...bankDetails, amount: e.target.value})} placeholder="Enter amount" className="w-full bg-brand-bgLight border border-brand-border rounded-xl py-3 px-4 text-white focus:outline-none focus:border-brand-blue text-sm" />
+                </div>
+                <button type="submit" disabled={loading} className="w-full bg-brand-blue hover:bg-brand-blueBright text-white font-bold py-3 rounded-xl mt-4 shadow-glow-sm transition-all disabled:opacity-50">
+                  {loading ? 'Processing...' : 'Submit Withdrawal Request'}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* WITHDRAWAL SUCCESS MODAL */}
+      <AnimatePresence>
+        {withdrawSuccess && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setWithdrawSuccess(false)} className="absolute inset-0 bg-black/90 backdrop-blur-xl" />
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="relative w-full max-w-sm bg-brand-bgCard border border-brand-border rounded-xl3 p-10 text-center shadow-glow-md">
+              <div className="w-20 h-20 bg-brand-green/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Check className="w-10 h-10 text-brand-green" />
+              </div>
+              <h2 className="text-2xl font-display font-bold text-white mb-2">Request Sent!</h2>
+              <p className="text-brand-muted text-sm mb-8 leading-relaxed">
+                Your withdrawal request has been received. Your funds will be transferred to your bank account within <span className="text-brand-blueBright font-bold">24 hours</span>.
+              </p>
+              <button onClick={() => setWithdrawSuccess(false)} className="w-full bg-brand-blue hover:bg-brand-blueBright text-white font-semibold py-3 rounded-xl transition-all">Understood</button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

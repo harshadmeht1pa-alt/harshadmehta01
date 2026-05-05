@@ -7,6 +7,8 @@ import {
   useMotionTemplate,
 } from "framer-motion";
 import { Zap } from "lucide-react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 const navLinks = ["Features", "How It Works", "Pricing"];
 
@@ -27,6 +29,19 @@ const linkHrefs: Record<string, string> = {
 
 export default function Navbar() {
   const { scrollY } = useScroll();
+  const [session, setSession] = useState<any>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Scroll-linked values
   const bgOpacity  = useTransform(scrollY, [0, 80], [0, 0.95]);
@@ -87,8 +102,8 @@ export default function Navbar() {
 
         {/* CTA */}
         <motion.a
-          href="/auth"
-          className="relative inline-flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold text-white overflow-hidden
+          href={session ? "/dashboard" : "/auth"}
+          className="relative inline-flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-semibold text-white overflow-hidden
             bg-brand-blue hover:bg-brand-blueBright transition-colors duration-200 shadow-glow-sm hover:shadow-glow-md"
           whileHover={{ scale: 1.04 }}
           whileTap={{ scale: 0.97 }}
@@ -96,8 +111,7 @@ export default function Navbar() {
           initial={{ opacity: 0, x: 16 }}
           animate={{ opacity: 1, x: 0 }}
         >
-          <Zap className="w-3.5 h-3.5" strokeWidth={2.5} />
-          Get Started
+          {session ? "Dashboard" : "Login"}
         </motion.a>
       </div>
     </motion.header>

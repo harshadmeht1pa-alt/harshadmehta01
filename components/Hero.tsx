@@ -8,7 +8,9 @@ import {
   useMotionValue,
   useSpring,
 } from "framer-motion";
-import { ArrowRight, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowRight, Sparkles, TrendingUp, LayoutDashboard } from "lucide-react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 // ── Char-by-char reveal variants ──────────────────────────────────────────────
 const charContainer = {
@@ -91,6 +93,19 @@ function MagneticButton({ href, primary, children }: { href: string; primary?: b
 export default function Hero() {
   const { scrollY } = useScroll();
   const glowY = useTransform(scrollY, [0, 600], [0, 120]);
+  const [session, setSession] = useState<any>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden pt-16 pb-24">
@@ -154,9 +169,18 @@ export default function Hero() {
             variants={fadeUpItem}
             className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8"
           >
-            <MagneticButton href="/auth" primary>
-              <TrendingUp className="w-4 h-4" />
-              Start Earning Now
+            <MagneticButton href={session ? "/dashboard" : "/auth"} primary>
+              {session ? (
+                <>
+                  <LayoutDashboard className="w-4 h-4" />
+                  Back to Dashboard
+                </>
+              ) : (
+                <>
+                  <TrendingUp className="w-4 h-4" />
+                  Start Earning Now
+                </>
+              )}
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
             </MagneticButton>
             <MagneticButton href="#">

@@ -26,6 +26,7 @@ CREATE TABLE public.chats (
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   admin_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL, -- Nullable until admin claims chat
   status TEXT DEFAULT 'open', -- open, closed, pending_payment
+  type TEXT DEFAULT 'plan_purchase', -- plan_purchase, deposit
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -51,6 +52,7 @@ CREATE TABLE public.withdrawals (
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   amount DECIMAL(10, 2) NOT NULL,
   status TEXT DEFAULT 'pending', -- pending, approved, rejected
+  details TEXT, -- Bank details, IFSC etc.
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -86,9 +88,18 @@ CREATE POLICY "Admins can manage all messages" ON public.messages USING (
   EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
 );
 
+-- Withdrawals: Users can insert/read their own. Admins can manage all.
+CREATE POLICY "Users can insert own withdrawals" ON public.withdrawals FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can read own withdrawals" ON public.withdrawals FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Admins can manage all withdrawals" ON public.withdrawals USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+);
+
 -----------------------------------------
 -- REALTIME SETUP
 -----------------------------------------
--- Enable realtime events for the chats and messages tables
+-- Enable realtime events for tables
 ALTER PUBLICATION supabase_realtime ADD TABLE public.chats;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.withdrawals;
