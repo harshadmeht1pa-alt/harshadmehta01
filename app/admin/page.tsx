@@ -43,7 +43,7 @@ export default function AdminDashboard() {
         const msg = payload.new;
         // Agar message kisi aur chat mein aaya hai (selected nahi) to unread mark karo
         if (msg.chat_id !== selectedChatRef.current?.id) {
-          setUnreadChatIds(prev => new Set([...prev, msg.chat_id]));
+          setUnreadChatIds(prev => { const n = new Set(prev); n.add(msg.chat_id); return n; });
         }
       })
       .subscribe();

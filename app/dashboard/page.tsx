@@ -122,7 +122,7 @@ export default function Dashboard() {
         const msg = payload.new;
         // Agar message admin ka hai aur woh chat abhi open nahi hai
         if (msg.sender_id !== profile.id && msg.chat_id !== openChatIdRef.current) {
-          setUnreadChatIds(prev => new Set([...prev, msg.chat_id]));
+          setUnreadChatIds(prev => { const n = new Set(prev); n.add(msg.chat_id); return n; });
         }
       })
       .subscribe();
