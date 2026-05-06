@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap, Mail, Phone, Lock, User, ArrowRight, Loader2, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
@@ -10,6 +10,13 @@ export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [refCode, setRefCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) setRefCode(ref);
+  }, []);
 
   // Form states
   const [fullName, setFullName] = useState("");
@@ -58,16 +65,17 @@ export default function AuthPage() {
 
         if (data.user) {
           // Create profile
+          const profileData: any = {
+            id: data.user.id,
+            full_name: fullName,
+            phone_number: phone,
+            role: 'user'
+          };
+          if (refCode) profileData.referred_by = refCode;
+
           const { error: profileError } = await supabase
             .from("profiles")
-            .insert([
-              {
-                id: data.user.id,
-                full_name: fullName,
-                phone_number: phone,
-                role: 'user'
-              },
-            ]);
+            .insert([profileData]);
           
           if (profileError) throw profileError;
           window.location.href = "/dashboard"; // New users are always users by default

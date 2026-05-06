@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, UserPlus, MessageSquare, IndianRupee, ShieldAlert, LogOut, Check, X, Send, Search, Loader2, Plus, Minus, CreditCard } from "lucide-react";
+import { Users, UserPlus, MessageSquare, IndianRupee, ShieldAlert, LogOut, Check, X, Send, Search, Loader2, Plus, Minus, CreditCard, ImagePlus } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
@@ -27,6 +27,7 @@ export default function AdminDashboard() {
   const [selectedUserForBalance, setSelectedUserForBalance] = useState<any>(null);
   const [adjustmentAmount, setAdjustmentAmount] = useState("");
   const [adjustmentType, setAdjustmentType] = useState<"add" | "cut">("add");
+  const [adminUploading, setAdminUploading] = useState(false);
 
   useEffect(() => {
     checkAdmin();
@@ -136,6 +137,50 @@ export default function AdminDashboard() {
     ]);
   };
 
+  const compressToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.src = ev.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX = 800;
+          let w = img.width, h = img.height;
+          if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+          if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL("image/jpeg", 0.7));
+        };
+        img.onerror = reject;
+      };
+      reader.onerror = reject;
+    });
+  };
+
+  const handleAdminImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedChat) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    setAdminUploading(true);
+    try {
+      const base64 = await compressToBase64(file);
+      await supabase.from("messages").insert([
+        { chat_id: selectedChat.id, sender_id: user.id, content: "[Image]", image_url: base64 }
+      ]);
+    } catch {
+      alert("Image processing failed. Please try again.");
+    }
+    setAdminUploading(false);
+    e.target.value = "";
+  };
+
   const adjustBalance = async (userId: string, currentBalance: number, amount: number) => {
     const newBalance = currentBalance + amount;
     if (newBalance < 0) return alert("Balance cannot be negative");
@@ -149,17 +194,45 @@ export default function AdminDashboard() {
     else fetchData();
   };
 
-  const assignPlan = async (userId: string, plan: string) => {
+  const planPrices: Record<string, number> = { Starter: 999, Growth: 2999, Elite: 4999, None: 0 };
+
+  const assignPlan = async (userId: string, rawPlan: string) => {
+    const plan = rawPlan.charAt(0).toUpperCase() + rawPlan.slice(1).toLowerCase();
+    const price = planPrices[plan] ?? 0;
+
     const { error } = await supabase
       .from("profiles")
-      .update({ current_plan: plan })
+      .update({ current_plan: plan, total_investment: price })
       .eq("id", userId);
-    
-    if (error) alert(error.message);
-    else {
-      alert(`Plan ${plan} assigned successfully!`);
-      fetchData();
+
+    if (error) { alert("Plan update failed: " + error.message); return; }
+
+    // Referral commission — 10% to referrer
+    if (price > 0) {
+      const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("referred_by")
+        .eq("id", userId)
+        .single();
+
+      if (userProfile?.referred_by) {
+        const { data: referrer } = await supabase
+          .from("profiles")
+          .select("earnings_balance")
+          .eq("id", userProfile.referred_by)
+          .single();
+
+        if (referrer) {
+          const commission = Math.floor(price * 0.1);
+          await supabase
+            .from("profiles")
+            .update({ earnings_balance: Number(referrer.earnings_balance) + commission })
+            .eq("id", userProfile.referred_by);
+        }
+      }
     }
+
+    fetchData();
   };
 
   const updateWithdrawalStatus = async (id: string, status: string) => {
@@ -457,13 +530,17 @@ export default function AdminDashboard() {
                               </div>
                             ))}
                           </div>
-                          <div className="p-4 border-t border-brand-border bg-brand-bgLight flex gap-2">
-                            <input 
-                              type="text" 
-                              value={chatInput} 
+                          <div className="p-4 border-t border-brand-border bg-brand-bgLight flex gap-2 items-center">
+                            <label className="cursor-pointer p-2 bg-brand-bg border border-brand-border rounded-xl text-brand-muted hover:text-white hover:border-brand-blue transition-colors" title="Send QR / Image">
+                              {adminUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+                              <input type="file" accept="image/*" className="hidden" onChange={handleAdminImageUpload} disabled={adminUploading} />
+                            </label>
+                            <input
+                              type="text"
+                              value={chatInput}
                               onChange={(e) => setChatInput(e.target.value)}
                               onKeyDown={(e) => e.key === 'Enter' && handleSendAdminMessage()}
-                              placeholder="Type a reply..." 
+                              placeholder="Type a reply..."
                               className="flex-1 bg-brand-bg border border-brand-border rounded-xl px-4 py-2 text-white text-sm"
                             />
                             <button onClick={handleSendAdminMessage} className="bg-brand-blue p-2 rounded-xl text-white"><Send className="w-4 h-4" /></button>

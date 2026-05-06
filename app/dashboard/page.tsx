@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Wallet, TrendingUp, IndianRupee, ArrowUpRight, Zap, History, Users, Send, AlertCircle, Loader2, LogOut, Check, MessageSquare } from "lucide-react";
 import Link from "next/link";
@@ -33,6 +33,8 @@ export default function Dashboard() {
   const [withdrawMethod, setWithdrawMethod] = useState<'upi' | 'qr' | 'bank'>('upi');
   const [bankDetails, setBankDetails] = useState({ holder: "", upiId: "", account: "", ifsc: "", amount: "", qrImage: "" });
   const [chatHistory, setChatHistory] = useState<any[]>([]);
+  const chatBottomRef = useRef<HTMLDivElement>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
     let userId: string | null = null;
@@ -69,6 +71,35 @@ export default function Dashboard() {
       supabase.removeChannel(profileSubscription);
     };
   }, []);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
+  // Real-time subscription for new messages in current chat
+  useEffect(() => {
+    if (!chat) return;
+
+    const channel = supabase
+      .channel(`user_chat_messages_${chat.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `chat_id=eq.${chat.id}`
+      }, (payload: any) => {
+        setChatMessages((prev) => {
+          if (prev.some((m: any) => m.id === payload.new.id)) return prev;
+          return [...prev, payload.new];
+        });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [chat?.id]);
 
   const fetchUserData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -152,18 +183,11 @@ export default function Dashboard() {
     }
 
     setChat(chatData);
-    
+
     const price = plan === 'Starter' ? 999 : plan === 'Growth' ? 2999 : 4999;
     await supabase.from("messages").insert([
-      { chat_id: chatData.id, sender_id: profile.id, content: `Hi, I want to purchase the ${plan} plan.` }
+      { chat_id: chatData.id, sender_id: profile.id, content: `Hi, I want to purchase the ${plan} plan for ₹${price}.` }
     ]);
-
-    setTimeout(async () => {
-      await supabase.from("messages").insert([
-        { chat_id: chatData.id, sender_id: null, content: `Sure! Please pay ₹${price} using this QR code.` },
-        { chat_id: chatData.id, sender_id: null, content: "[QR_CODE_IMAGE]" }
-      ]);
-    }, 1000);
 
     fetchMessages(chatData.id);
     setLoading(false);
@@ -193,13 +217,6 @@ export default function Dashboard() {
     await supabase.from("messages").insert([
       { chat_id: chatData.id, sender_id: profile.id, content: `Hi, I want to deposit money into my balance.` }
     ]);
-
-    setTimeout(async () => {
-      await supabase.from("messages").insert([
-        { chat_id: chatData.id, sender_id: null, content: `Hello! Please send the amount you want to deposit to our UPI ID and share the screenshot here. Your balance will be updated soon.` },
-        { chat_id: chatData.id, sender_id: null, content: "[QR_CODE_IMAGE]" }
-      ]);
-    }, 1000);
 
     fetchMessages(chatData.id);
     setLoading(false);
@@ -250,38 +267,45 @@ export default function Dashboard() {
     ]);
   };
 
+  const compressToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.src = ev.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX = 800;
+          let w = img.width, h = img.height;
+          if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+          if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL("image/jpeg", 0.7));
+        };
+        img.onerror = reject;
+      };
+      reader.onerror = reject;
+    });
+  };
+
   const handleFileUpload = async (e: any) => {
     const file = e.target.files[0];
     if (!file || !chat || !profile) return;
-    
+
     setUploading(true);
-    const fileName = `${profile.id}/${Date.now()}-${file.name}`;
-    
-    const { data, error } = await supabase.storage
-      .from('payments')
-      .upload(fileName, file);
-
-    if (error) {
-      alert("Error uploading file: " + error.message);
-      setUploading(false);
-      return;
-    }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('payments')
-      .getPublicUrl(fileName);
-
-    await supabase.from("messages").insert([
-      { chat_id: chat.id, sender_id: profile.id, content: "[Screenshot Attached]", image_url: publicUrl }
-    ]);
-
-    setTimeout(async () => {
+    try {
+      const base64 = await compressToBase64(file);
       await supabase.from("messages").insert([
-        { chat_id: chat.id, sender_id: null, content: "Thank you! Your payment/deposit screenshot is received. It will be verified and approved within 24 hours." }
+        { chat_id: chat.id, sender_id: profile.id, content: "[Screenshot Attached]", image_url: base64 }
       ]);
-    }, 1000);
-
+    } catch {
+      alert("Error processing image. Please try again.");
+    }
     setUploading(false);
+    e.target.value = "";
   };
 
   if (loading && !profile) return (
@@ -362,14 +386,15 @@ export default function Dashboard() {
                 {chatMessages.map((msg, i) => (
                   <div key={i} className={`flex ${msg.sender_id === profile.id ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[75%] p-3 rounded-xl text-sm ${msg.sender_id === profile.id ? 'bg-brand-blue text-white rounded-tr-none' : 'bg-brand-bgLight border border-brand-border text-brand-muted rounded-tl-none'}`}>
-                      {msg.content === "[QR_CODE_IMAGE]" ? (
-                        <div className="w-48 h-48 bg-white rounded-lg flex items-center justify-center">
-                          <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=rpc@ybl&pn=RPC" alt="QR" className="w-40 h-40" />
-                        </div>
-                      ) : msg.content === "[Screenshot Attached]" ? (
-                        <div className="space-y-2">
-                          <img src={msg.image_url} alt="Screenshot" className="w-48 rounded-lg" />
-                          <div className="text-[10px] opacity-70">Payment Screenshot Attached</div>
+                      {msg.image_url ? (
+                        <div className="space-y-1">
+                          <img
+                            src={msg.image_url}
+                            alt="Image"
+                            className="max-w-[220px] rounded-lg cursor-pointer"
+                            onClick={() => window.open(msg.image_url, '_blank')}
+                          />
+                          <div className="text-[10px] opacity-60">Tap to view full size</div>
                         </div>
                       ) : (
                         msg.content
@@ -377,6 +402,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ))}
+                <div ref={chatBottomRef} />
               </div>
               <div className="p-4 border-t border-brand-border bg-brand-bgLight">
                 <div className="flex gap-2">
@@ -453,6 +479,18 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
+
+                <div className="glass-card bg-brand-bgCard border border-brand-border rounded-xl3 p-6 flex flex-col justify-center relative overflow-hidden">
+                  <div className="flex items-center gap-3 mb-3 relative z-10">
+                    <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-400 text-xl">🪙</div>
+                    <h2 className="text-lg font-semibold">My Coins</h2>
+                  </div>
+                  <div className="relative z-10">
+                    <span className="text-3xl font-display font-bold text-yellow-400">{Math.floor(profile.total_investment).toLocaleString("en-IN")}</span>
+                    <span className="text-brand-muted text-xs ml-2">coins</span>
+                  </div>
+                  <div className="text-[10px] text-brand-muted mt-1 relative z-10">1 Coin = ₹1</div>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <button 
                     onClick={handleDepositRequest}
@@ -472,18 +510,31 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="mt-6 glass-card bg-brand-bgCard border border-brand-border rounded-xl3 p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 overflow-hidden relative group hover:border-brand-green/30 transition-colors">
+            <div className="mt-6 glass-card bg-brand-bgCard border border-brand-border rounded-xl3 p-6 sm:p-8 overflow-hidden relative group hover:border-brand-green/30 transition-colors">
               <div className="absolute top-0 right-0 w-48 h-48 bg-brand-green opacity-5 blur-3xl rounded-full" />
-              <div className="flex items-center gap-4 relative z-10">
-                <div className="w-12 h-12 rounded-xl bg-brand-green/15 flex items-center justify-center text-brand-green shrink-0"><Users className="w-6 h-6" /></div>
-                <div>
-                  <h3 className="text-xl font-semibold text-white mb-1">Refer and Earn</h3>
-                  <p className="text-brand-muted text-sm">Invite your friends and earn <strong className="text-brand-green font-semibold">10% per person invite</strong>.</p>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-brand-green/15 flex items-center justify-center text-brand-green shrink-0"><Users className="w-6 h-6" /></div>
+                  <div>
+                    <h3 className="text-xl font-semibold text-white mb-1">Refer and Earn</h3>
+                    <p className="text-brand-muted text-sm">Invite friends and earn <strong className="text-brand-green font-semibold">10% of their plan price</strong> automatically.</p>
+                  </div>
                 </div>
+                <button
+                  onClick={() => {
+                    const link = `${window.location.origin}/auth?ref=${profile.id}`;
+                    navigator.clipboard.writeText(link);
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 2000);
+                  }}
+                  className="relative z-10 w-full sm:w-auto px-5 py-2.5 rounded-lg bg-brand-green/20 border border-brand-green/30 text-brand-green text-sm font-semibold hover:bg-brand-green/30 transition-colors whitespace-nowrap"
+                >
+                  {linkCopied ? "✓ Copied!" : "Copy Invite Link"}
+                </button>
               </div>
-              <button className="relative z-10 w-full sm:w-auto px-5 py-2.5 rounded-lg bg-brand-bgLight border border-brand-border text-white text-sm font-semibold hover:border-brand-green/50 transition-colors whitespace-nowrap">
-                Copy Invite Link
-              </button>
+              <div className="mt-4 relative z-10 bg-brand-bgLight border border-brand-border rounded-xl px-4 py-3 flex items-center gap-2 overflow-hidden">
+                <span className="text-brand-muted text-xs truncate flex-1 font-mono">{typeof window !== 'undefined' ? `${window.location.origin}/auth?ref=${profile.id}` : ''}</span>
+              </div>
             </div>
 
             {/* CHAT HISTORY */}
@@ -614,6 +665,29 @@ export default function Dashboard() {
                   {loading ? 'Processing...' : 'Submit Withdrawal Request'}
                 </button>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* LOGOUT CONFIRMATION MODAL */}
+      <AnimatePresence>
+        {showLogoutConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowLogoutConfirm(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="relative w-full max-w-sm bg-brand-bgCard border border-brand-border rounded-xl3 p-8 shadow-card overflow-hidden">
+              <div className="absolute -top-12 -right-12 w-24 h-24 bg-red-500 opacity-10 blur-2xl rounded-full" />
+              <div className="text-center relative z-10">
+                <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-6">
+                  <LogOut className="w-8 h-8 text-red-500" />
+                </div>
+                <h3 className="text-2xl font-display font-bold text-white mb-2">Sign Out?</h3>
+                <p className="text-brand-muted text-sm mb-8">Are you sure you want to log out from your account?</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <button onClick={() => setShowLogoutConfirm(false)} className="py-3 px-4 rounded-xl border border-brand-border text-white font-semibold hover:bg-brand-bgLight transition-colors">Cancel</button>
+                  <button onClick={() => supabase.auth.signOut().then(() => window.location.href = "/auth")} className="py-3 px-4 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold transition-colors">Log Out</button>
+                </div>
+              </div>
             </motion.div>
           </div>
         )}

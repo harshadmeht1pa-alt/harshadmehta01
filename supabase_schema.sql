@@ -84,7 +84,9 @@ CREATE POLICY "Users can read messages in own chats" ON public.messages FOR SELE
 CREATE POLICY "Users can insert messages in own chats" ON public.messages FOR INSERT WITH CHECK (
   EXISTS (SELECT 1 FROM public.chats WHERE id = messages.chat_id AND user_id = auth.uid())
 );
-CREATE POLICY "Admins can manage all messages" ON public.messages USING (
+CREATE POLICY "Admins can manage all messages" ON public.messages FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+) WITH CHECK (
   EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
 );
 
