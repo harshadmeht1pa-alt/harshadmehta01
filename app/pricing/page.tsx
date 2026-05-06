@@ -22,7 +22,7 @@ const features = [
 const pricingFAQs = [
   { question: "Is this a subscription?", answer: "No. RPC plans are a one-time payment with lifetime access. There are no recurring monthly or annual charges." },
   { question: "What payment methods are accepted?", answer: "We accept UPI, net banking, debit/credit cards, and popular wallets via our secure payment gateway (Razorpay). All transactions are encrypted." },
-  { question: "Can I upgrade my plan later?", answer: "Yes. You can upgrade from Starter to Growth or Elite at any time by paying the differential. Contact support@RPC.in to process an upgrade." },
+  { question: "Can I upgrade my plan later?", answer: "Yes. You can upgrade from Starter (₹1,999) to Growth (₹2,999) or Elite (₹3,999) at any time by paying the differential. Contact support@RPC.in to process an upgrade." },
   { question: "Is there a free trial?", answer: "We do not currently offer a free trial. However, we offer a 7-day refund window (subject to eligibility conditions) for members who are not satisfied after joining." },
   { question: "What happens immediately after purchase?", answer: "You will receive an email confirmation with your access credentials within minutes of payment. Your dashboard, modules, and AI signals are available immediately." },
   { question: "Do the prices include taxes?", answer: "All displayed prices are inclusive of applicable GST at the prevailing rate. You will receive a GST invoice via email." },

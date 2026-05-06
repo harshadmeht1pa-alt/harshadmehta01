@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, UserPlus, MessageSquare, IndianRupee, ShieldAlert, LogOut, Check, X, Send, Search, Loader2, Plus, Minus, CreditCard, ImagePlus } from "lucide-react";
 import Link from "next/link";
@@ -28,16 +28,24 @@ export default function AdminDashboard() {
   const [adjustmentAmount, setAdjustmentAmount] = useState("");
   const [adjustmentType, setAdjustmentType] = useState<"add" | "cut">("add");
   const [adminUploading, setAdminUploading] = useState(false);
+  const [unreadChatIds, setUnreadChatIds] = useState<Set<string>>(new Set());
+  const selectedChatRef = useRef<any>(null);
 
   useEffect(() => {
     checkAdmin();
-    
-    // Subscribe to everything for real-time updates
+
     const channel = supabase
       .channel('admin_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawals' }, () => fetchData())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload: any) => {
+        const msg = payload.new;
+        // Agar message kisi aur chat mein aaya hai (selected nahi) to unread mark karo
+        if (msg.chat_id !== selectedChatRef.current?.id) {
+          setUnreadChatIds(prev => new Set([...prev, msg.chat_id]));
+        }
+      })
       .subscribe();
 
     return () => {
@@ -121,7 +129,9 @@ export default function AdminDashboard() {
   }, [selectedChat?.id]);
 
   const handleSelectChat = (chat: any) => {
+    selectedChatRef.current = chat;
     setSelectedChat(chat);
+    setUnreadChatIds(prev => { const n = new Set(prev); n.delete(chat.id); return n; });
     fetchMessages(chat.id);
   };
 
@@ -194,7 +204,7 @@ export default function AdminDashboard() {
     else fetchData();
   };
 
-  const planPrices: Record<string, number> = { Starter: 999, Growth: 2999, Elite: 4999, None: 0 };
+  const planPrices: Record<string, number> = { Starter: 1999, Growth: 2999, Elite: 3999, None: 0 };
 
   const assignPlan = async (userId: string, rawPlan: string) => {
     const plan = rawPlan.charAt(0).toUpperCase() + rawPlan.slice(1).toLowerCase();
@@ -337,7 +347,12 @@ export default function AdminDashboard() {
               }`}
             >
               <tab.icon className="w-5 h-5" />
-              <span className="font-medium text-sm">{tab.id}</span>
+              <span className="font-medium text-sm flex-1 text-left">{tab.id}</span>
+              {tab.id === "Chats" && unreadChatIds.size > 0 && (
+                <span className="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                  {unreadChatIds.size}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -470,9 +485,9 @@ export default function AdminDashboard() {
                               defaultValue=""
                             >
                               <option value="" disabled>Assign Plan...</option>
-                              <option value="Starter">Starter (₹999)</option>
-                              <option value="Growth">Growth (₹2999)</option>
-                              <option value="Elite">Elite (₹4999)</option>
+                              <option value="Starter">Starter (₹1,999)</option>
+                              <option value="Growth">Growth (₹2,999)</option>
+                              <option value="Elite">Elite (₹3,999)</option>
                             </select>
                           </td>
                         </tr>
@@ -499,12 +514,15 @@ export default function AdminDashboard() {
                     {/* Chat List */}
                     <div className="w-1/3 border-r border-brand-border overflow-y-auto">
                       {filteredChats.map(c => (
-                        <div 
-                          key={c.id} 
+                        <div
+                          key={c.id}
                           onClick={() => handleSelectChat(c)}
-                          className={`p-4 border-b border-brand-border cursor-pointer transition-colors ${selectedChat?.id === c.id ? "bg-brand-blue/10 border-l-4 border-l-brand-blue" : "hover:bg-brand-bgLight"}`}
+                          className={`p-4 border-b border-brand-border cursor-pointer transition-colors relative ${selectedChat?.id === c.id ? "bg-brand-blue/10 border-l-4 border-l-brand-blue" : "hover:bg-brand-bgLight"}`}
                         >
-                          <div className="font-semibold text-white">{c.profiles?.full_name || "User"}</div>
+                          {unreadChatIds.has(c.id) && (
+                            <span className="absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                          )}
+                          <div className="font-semibold text-white pr-5">{c.profiles?.full_name || "User"}</div>
                           <div className="flex items-center justify-between mt-1">
                             <span className={`text-[9px] px-1.5 py-0.5 rounded ${c.type === 'deposit' ? 'bg-brand-gold/10 text-brand-gold' : 'bg-brand-blue/10 text-brand-blueBright'}`}>{c.type === 'deposit' ? 'DEPOSIT' : 'PLAN'}</span>
                             <span className="text-[10px] text-brand-muted uppercase">{c.status}</span>

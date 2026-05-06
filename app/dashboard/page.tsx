@@ -35,6 +35,8 @@ export default function Dashboard() {
   const [chatHistory, setChatHistory] = useState<any[]>([]);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [unreadChatIds, setUnreadChatIds] = useState<Set<string>>(new Set());
+  const openChatIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let userId: string | null = null;
@@ -81,6 +83,10 @@ export default function Dashboard() {
   useEffect(() => {
     if (!chat) return;
 
+    openChatIdRef.current = chat.id;
+    // Chat open hote hi unread clear karo
+    setUnreadChatIds(prev => { const n = new Set(prev); n.delete(chat.id); return n; });
+
     const channel = supabase
       .channel(`user_chat_messages_${chat.id}`)
       .on('postgres_changes', {
@@ -97,9 +103,32 @@ export default function Dashboard() {
       .subscribe();
 
     return () => {
+      openChatIdRef.current = null;
       supabase.removeChannel(channel);
     };
   }, [chat?.id]);
+
+  // Global subscription — sare chats ke naye messages track karo (unread)
+  useEffect(() => {
+    if (!profile) return;
+
+    const channel = supabase
+      .channel(`user_unread_${profile.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+      }, (payload: any) => {
+        const msg = payload.new;
+        // Agar message admin ka hai aur woh chat abhi open nahi hai
+        if (msg.sender_id !== profile.id && msg.chat_id !== openChatIdRef.current) {
+          setUnreadChatIds(prev => new Set([...prev, msg.chat_id]));
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [profile?.id]);
 
   const fetchUserData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -184,7 +213,7 @@ export default function Dashboard() {
 
     setChat(chatData);
 
-    const price = plan === 'Starter' ? 999 : plan === 'Growth' ? 2999 : 4999;
+    const price = plan === 'Starter' ? 1999 : plan === 'Growth' ? 2999 : 3999;
     await supabase.from("messages").insert([
       { chat_id: chatData.id, sender_id: profile.id, content: `Hi, I want to purchase the ${plan} plan for ₹${price}.` }
     ]);
@@ -346,12 +375,18 @@ export default function Dashboard() {
               <p className="text-brand-muted">Choose a plan to activate your earning dashboard.</p>
             </div>
             <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-              {["Starter", "Growth", "Elite"].map((plan) => (
-                <div key={plan} className="bg-brand-bgCard border border-brand-border rounded-xl3 p-6 text-center hover:border-brand-blue/50 transition-colors">
-                  <h3 className="text-xl font-bold mb-2">{plan}</h3>
-                  <p className="text-brand-muted text-sm mb-6">Gain access to our premium earning strategies.</p>
-                  <button onClick={() => handleSelectPlan(plan)} className="w-full bg-brand-blue hover:bg-brand-blueBright text-white font-semibold py-3 rounded-xl transition-colors">
-                    Select {plan}
+              {[
+                { name: "Starter", price: 1999, emoji: "🚀", daily: 60 },
+                { name: "Growth",  price: 2999, emoji: "🔥", daily: 95 },
+                { name: "Elite",   price: 3999, emoji: "👑", daily: 125 },
+              ].map((plan) => (
+                <div key={plan.name} className={`bg-brand-bgCard border rounded-xl3 p-6 text-center transition-colors ${plan.name === 'Growth' ? 'border-brand-blue/60 shadow-glow-sm' : 'border-brand-border hover:border-brand-blue/40'}`}>
+                  <div className="text-3xl mb-2">{plan.emoji}</div>
+                  <h3 className="text-xl font-bold mb-1 text-white">{plan.name}</h3>
+                  <div className="text-3xl font-display font-bold text-white my-3">₹{plan.price.toLocaleString('en-IN')}</div>
+                  <div className="text-xs text-brand-green bg-brand-green/10 px-3 py-1 rounded-full inline-block mb-5">₹{plan.daily}/day potential</div>
+                  <button onClick={() => handleSelectPlan(plan.name)} className={`w-full font-semibold py-3 rounded-xl transition-colors ${plan.name === 'Growth' ? 'bg-brand-blue hover:bg-brand-blueBright text-white' : 'bg-brand-bgLight border border-brand-border hover:border-brand-blue/50 text-white'}`}>
+                    Select {plan.name}
                   </button>
                 </div>
               ))}
@@ -542,21 +577,38 @@ export default function Dashboard() {
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 rounded-xl bg-brand-blue/20 flex items-center justify-center text-brand-blueBright"><MessageSquare className="w-5 h-5" /></div>
                 <h2 className="text-xl font-semibold">Chat History</h2>
+                {unreadChatIds.size > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                    {unreadChatIds.size}
+                  </span>
+                )}
               </div>
               {chatHistory.length > 0 ? (
                 <div className="space-y-3">
                   {chatHistory.map((c) => (
-                    <div 
-                      key={c.id} 
-                      onClick={() => { setChat(c); fetchMessages(c.id); }}
-                      className="flex items-center justify-between p-4 bg-brand-bgLight border border-brand-border rounded-xl hover:border-brand-blue/40 cursor-pointer transition-all group"
+                    <div
+                      key={c.id}
+                      onClick={() => {
+                        setChat(c);
+                        fetchMessages(c.id);
+                        setUnreadChatIds(prev => { const n = new Set(prev); n.delete(c.id); return n; });
+                      }}
+                      className={`flex items-center justify-between p-4 bg-brand-bgLight border rounded-xl cursor-pointer transition-all group ${unreadChatIds.has(c.id) ? 'border-red-500/50 shadow-[0_0_12px_rgba(239,68,68,0.15)]' : 'border-brand-border hover:border-brand-blue/40'}`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${c.type === 'deposit' ? 'bg-brand-gold/10 text-brand-gold' : 'bg-brand-blue/10 text-brand-blueBright'}`}>
-                          {c.type === 'deposit' ? <IndianRupee className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
+                        <div className="relative">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${c.type === 'deposit' ? 'bg-brand-gold/10 text-brand-gold' : 'bg-brand-blue/10 text-brand-blueBright'}`}>
+                            {c.type === 'deposit' ? <IndianRupee className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
+                          </div>
+                          {unreadChatIds.has(c.id) && (
+                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                          )}
                         </div>
                         <div>
-                          <div className="text-white text-sm font-medium">{c.type === 'deposit' ? 'Deposit Request' : 'Plan Purchase'}</div>
+                          <div className="text-white text-sm font-medium flex items-center gap-2">
+                            {c.type === 'deposit' ? 'Deposit Request' : 'Plan Purchase'}
+                            {unreadChatIds.has(c.id) && <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold">NEW</span>}
+                          </div>
                           <div className="text-[10px] text-brand-muted">{new Date(c.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
                         </div>
                       </div>
